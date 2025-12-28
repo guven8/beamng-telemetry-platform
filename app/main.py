@@ -17,6 +17,9 @@ from app.modules.auth.router import router as auth_router
 from app.modules.telemetry.listener import udp_listener
 from app.modules.stream.router import router as stream_router
 from app.modules.stream.consumer import telemetry_consumer
+from app.modules.analytics.router import router as analytics_router
+from app.modules.analytics.persistence import persistence_worker
+from app.modules.analytics.database import init_db
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,14 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting BeamNG Telemetry Platform...")
     
+    # Initialize database tables
+    try:
+        init_db()
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.warning(f"Database initialization warning: {e}")
+        logger.warning("Continuing without database - persistence will not work")
+    
     # Create telemetry queue for internal communication
     app.state.telemetry_queue = asyncio.Queue()
     logger.info("Created telemetry queue")
@@ -49,10 +60,22 @@ async def lifespan(app: FastAPI):
     consumer_task = asyncio.create_task(telemetry_consumer(app.state.telemetry_queue))
     logger.info("Started telemetry consumer background task")
     
+    # Start persistence worker as background task
+    persistence_task = asyncio.create_task(persistence_worker(app.state.telemetry_queue))
+    logger.info("Started persistence worker background task")
+    
     yield
     
     # Shutdown
     logger.info("Shutting down BeamNG Telemetry Platform...")
+    
+    # Cancel persistence worker task
+    if not persistence_task.done():
+        persistence_task.cancel()
+        try:
+            await persistence_task
+        except asyncio.CancelledError:
+            logger.info("Persistence worker task cancelled")
     
     # Cancel telemetry consumer task
     if not consumer_task.done():
@@ -93,6 +116,7 @@ app.add_middleware(
 # Include feature module routers
 app.include_router(auth_router)
 app.include_router(stream_router)
+app.include_router(analytics_router)
 
 
 @app.get("/health")
