@@ -74,6 +74,10 @@ def parse_outgauge_packet(data: bytes) -> TelemetrySample | None:
             _plid = unpacked[4]
             speed = unpacked[5]  # m/s
             rpm_float = unpacked[6]
+            
+            # Debug: log gear_char to understand what we're getting
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Raw gear_char: {repr(gear_char)}, type: {type(gear_char)}")
             _turbo = unpacked[7]
             _eng_temp = unpacked[8]
             _fuel = unpacked[9]
@@ -91,19 +95,53 @@ def parse_outgauge_packet(data: bytes) -> TelemetrySample | None:
             # Convert gear character to integer
             # With 'c' format, gear_char is a bytes object of length 1
             gear = None
-            if isinstance(gear_char, bytes) and len(gear_char) > 0:
-                gear_byte = gear_char[0]
-            elif isinstance(gear_char, str) and len(gear_char) > 0:
-                gear_byte = ord(gear_char[0])
+            gear_byte = None
+            
+            if isinstance(gear_char, bytes):
+                if len(gear_char) > 0:
+                    gear_byte = gear_char[0]
+                else:
+                    gear_byte = 0
+            elif isinstance(gear_char, str):
+                if len(gear_char) > 0:
+                    gear_byte = ord(gear_char[0])
+                else:
+                    gear_byte = 0
+            elif isinstance(gear_char, int):
+                gear_byte = gear_char
             else:
                 gear_byte = 0
+                logger.warning(f"Unexpected gear_char type: {type(gear_char)}, value: {repr(gear_char)}")
             
-            if gear_byte == ord('R') or gear_byte == ord('r'):
-                gear = -1  # Reverse
-            elif gear_byte == ord('N') or gear_byte == ord('n'):
-                gear = 0  # Neutral
-            elif ord('0') <= gear_byte <= ord('9'):
-                gear = gear_byte - ord('0')
+            # Parse gear value
+            # BeamNG OutGauge uses numeric values: 0=neutral, 1-9=gears, might use -1 for reverse
+            # Some implementations use ASCII chars ('R', 'N', '0'-'9'), others use direct numeric
+            if gear_byte is not None:
+                # First check for ASCII character format
+                if gear_byte == ord('R') or gear_byte == ord('r'):
+                    gear = -1  # Reverse
+                elif gear_byte == ord('N') or gear_byte == ord('n'):
+                    gear = 0  # Neutral
+                elif ord('0') <= gear_byte <= ord('9'):
+                    gear = gear_byte - ord('0')
+                # Then check for direct numeric format (BeamNG style)
+                elif 0 <= gear_byte <= 9:
+                    # Direct numeric: 0=neutral, 1-9=gears
+                    gear = gear_byte
+                elif gear_byte == 255 or gear_byte == 0xFF:
+                    # 0xFF might indicate reverse in some implementations
+                    gear = -1
+                elif gear_byte == 0:
+                    # Null byte - neutral
+                    gear = 0
+                else:
+                    # Unknown gear value - log for debugging (only first few times to avoid spam)
+                    if not hasattr(parse_outgauge_packet, '_gear_warn_count'):
+                        parse_outgauge_packet._gear_warn_count = 0
+                    if parse_outgauge_packet._gear_warn_count < 5:
+                        logger.warning(f"Unknown gear byte value: {gear_byte} (0x{gear_byte:02x}, char: {chr(gear_byte) if 32 <= gear_byte < 127 else 'N/A'})")
+                        parse_outgauge_packet._gear_warn_count += 1
+                    gear = None
             
             # Convert RPM float to int
             rpm = int(rpm_float) if rpm_float is not None else None
@@ -137,17 +175,38 @@ def parse_outgauge_packet(data: bytes) -> TelemetrySample | None:
                 # Parse gear
                 gear_char = minimal[3]
                 gear = None
+                gear_byte = None
+                
                 if isinstance(gear_char, bytes):
                     gear_byte = gear_char[0] if len(gear_char) > 0 else 0
+                elif isinstance(gear_char, str):
+                    gear_byte = ord(gear_char[0]) if len(gear_char) > 0 else 0
+                elif isinstance(gear_char, int):
+                    gear_byte = gear_char
                 else:
-                    gear_byte = ord(gear_char) if isinstance(gear_char, str) else gear_char
+                    gear_byte = 0
                 
-                if gear_byte == ord('R') or gear_byte == ord('r'):
-                    gear = -1
-                elif gear_byte == ord('N') or gear_byte == ord('n'):
-                    gear = 0
-                elif ord('0') <= gear_byte <= ord('9'):
-                    gear = gear_byte - ord('0')
+                # Parse gear value
+                # BeamNG OutGauge uses numeric values: 0=neutral, 1-9=gears
+                if gear_byte is not None:
+                    # First check for ASCII character format
+                    if gear_byte == ord('R') or gear_byte == ord('r'):
+                        gear = -1
+                    elif gear_byte == ord('N') or gear_byte == ord('n'):
+                        gear = 0
+                    elif ord('0') <= gear_byte <= ord('9'):
+                        gear = gear_byte - ord('0')
+                    # Then check for direct numeric format (BeamNG style)
+                    elif 0 <= gear_byte <= 9:
+                        # Direct numeric: 0=neutral, 1-9=gears
+                        gear = gear_byte
+                    elif gear_byte == 255 or gear_byte == 0xFF:
+                        # 0xFF might indicate reverse
+                        gear = -1
+                    elif gear_byte == 0:
+                        gear = 0  # Null byte = neutral
+                    else:
+                        gear = None
                 
                 rpm = int(rpm_float) if rpm_float is not None else None
                 
