@@ -21,13 +21,17 @@ class TelemetryFrameResponse(BaseModel):
 
 
 class SessionResponse(BaseModel):
-    """Session response model."""
+    """Session response model with analytics."""
     id: int
     user_id: int
     car_name: Optional[str] = None
     start_time: datetime
     end_time: Optional[datetime] = None
     frame_count: Optional[int] = None  # Number of frames in session
+    duration_seconds: Optional[float] = None  # Session duration in seconds
+    top_speed: Optional[float] = None  # Top speed in m/s
+    avg_speed: Optional[float] = None  # Average speed in m/s
+    max_rpm: Optional[int] = None  # Maximum RPM
 
     model_config = {"from_attributes": True}
 

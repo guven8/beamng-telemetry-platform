@@ -11,6 +11,7 @@ from sqlalchemy import func
 from app.modules.analytics.database import get_db
 from app.modules.analytics.models import Session as SessionModel, TelemetryFrame
 from app.modules.analytics.schemas import SessionResponse, SessionDetailResponse, TelemetryFrameResponse
+from app.modules.analytics.analytics import calculate_session_analytics
 from app.modules.auth.deps import get_current_user
 from app.modules.auth.schemas import User
 
@@ -39,29 +40,37 @@ async def list_sessions(
             SessionModel.start_time.desc()
         ).offset(skip).limit(limit).all()
         
-        # Get frame counts for each session
+        # Get all frames for all sessions (for analytics calculation)
         session_ids = [s.id for s in sessions]
-        frame_counts = {}
+        all_frames = {}
         if session_ids:
-            counts = db.query(
-                TelemetryFrame.session_id,
-                func.count(TelemetryFrame.id).label('count')
-            ).filter(
+            frames = db.query(TelemetryFrame).filter(
                 TelemetryFrame.session_id.in_(session_ids)
-            ).group_by(TelemetryFrame.session_id).all()
+            ).all()
             
-            frame_counts = {session_id: count for session_id, count in counts}
+            # Group frames by session_id
+            for frame in frames:
+                if frame.session_id not in all_frames:
+                    all_frames[frame.session_id] = []
+                all_frames[frame.session_id].append(frame)
         
-        # Build response with frame counts
+        # Build response with analytics
         result = []
         for session in sessions:
+            frames_for_session = all_frames.get(session.id, [])
+            analytics = calculate_session_analytics(session, frames_for_session)
+            
             session_dict = {
                 "id": session.id,
                 "user_id": session.user_id,
                 "car_name": session.car_name,
                 "start_time": session.start_time,
                 "end_time": session.end_time,
-                "frame_count": frame_counts.get(session.id, 0)
+                "frame_count": len(frames_for_session),
+                "duration_seconds": analytics["duration_seconds"],
+                "top_speed": analytics["top_speed"],
+                "avg_speed": analytics["avg_speed"],
+                "max_rpm": analytics["max_rpm"],
             }
             result.append(SessionResponse(**session_dict))
         
@@ -103,6 +112,9 @@ async def get_session(
             TelemetryFrame.session_id == session_id
         ).order_by(TelemetryFrame.timestamp.asc()).all()
         
+        # Calculate analytics
+        analytics = calculate_session_analytics(session, frames)
+        
         # Build response
         return SessionDetailResponse(
             id=session.id,
@@ -111,6 +123,10 @@ async def get_session(
             start_time=session.start_time,
             end_time=session.end_time,
             frame_count=len(frames),
+            duration_seconds=analytics["duration_seconds"],
+            top_speed=analytics["top_speed"],
+            avg_speed=analytics["avg_speed"],
+            max_rpm=analytics["max_rpm"],
             frames=[TelemetryFrameResponse.model_validate(frame) for frame in frames]
         )
     except HTTPException:

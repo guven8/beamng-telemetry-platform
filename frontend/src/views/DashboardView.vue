@@ -3,6 +3,7 @@
     <header class="dashboard-header">
       <h1>BeamNG Telemetry Dashboard</h1>
       <div class="header-actions">
+        <router-link to="/sessions" class="nav-link">Sessions</router-link>
         <span class="connection-status" :class="{ connected: isConnected }">
           {{ isConnected ? '● Connected' : '○ Disconnected' }}
         </span>
@@ -162,6 +163,20 @@ function formatGForce(gForce) {
 
 .connection-status.connected {
   color: #4caf50;
+}
+
+.nav-link {
+  padding: 8px 16px;
+  background: #667eea;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.nav-link:hover {
+  background: #5568d3;
 }
 
 .logout-button {
