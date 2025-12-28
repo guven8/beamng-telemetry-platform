@@ -22,6 +22,10 @@ async def persistence_worker(queue: asyncio.Queue) -> None:
     Consumes TelemetrySample objects from queue, manages sessions,
     and saves frames at controlled intervals.
     
+    This worker runs for the entire app lifetime and handles multiple sessions.
+    When a session ends, it continues running and will create a new session
+    when movement resumes.
+    
     Args:
         queue: asyncio.Queue containing TelemetrySample objects
     """
@@ -32,9 +36,15 @@ async def persistence_worker(queue: asyncio.Queue) -> None:
     USER_ID = 1
     
     db: Session = SessionLocal()
-    session_manager = SessionManager(db, user_id=USER_ID)
+    try:
+        session_manager = SessionManager(db, user_id=USER_ID)
+    except Exception as e:
+        logger.error(f"Failed to initialize session manager: {e}", exc_info=True)
+        db.close()
+        return
     
     try:
+        # Main loop - runs until app shutdown
         while True:
             try:
                 # Get telemetry sample from queue (with timeout to allow cancellation)
@@ -43,10 +53,11 @@ async def persistence_worker(queue: asyncio.Queue) -> None:
                     timeout=1.0
                 )
                 
-                # Process sample and get current session
+                # Process sample and get current active session
+                # This handles session start/end logic
                 current_session = session_manager.process_sample(sample)
                 
-                # Save frame if we have an active session and interval has passed
+                # Save frame if we have an active session and save interval has passed
                 if current_session is not None:
                     now = datetime.utcnow()
                     if session_manager.should_save_frame(now):
@@ -56,16 +67,18 @@ async def persistence_worker(queue: asyncio.Queue) -> None:
             except asyncio.TimeoutError:
                 # Timeout is expected - allows us to check for cancellation
                 # Check if we need to end an inactive session
+                # This ensures sessions end even if no new samples arrive
                 now = datetime.utcnow()
                 session_manager.check_inactivity(now)
                 continue
             except Exception as e:
                 logger.error(f"Error in persistence worker: {e}", exc_info=True)
+                # Continue processing even if one sample fails
                 await asyncio.sleep(0.1)
                 
     except asyncio.CancelledError:
         logger.info("Persistence worker cancelled, shutting down...")
-        # End current session if active
+        # End current session if active before shutdown
         if session_manager.current_session is not None:
             session_manager._end_session(datetime.utcnow())
         raise
@@ -74,6 +87,7 @@ async def persistence_worker(queue: asyncio.Queue) -> None:
         raise
     finally:
         db.close()
+        logger.info("Persistence worker stopped")
 
 
 def _save_frame(db: Session, session_id: int, sample: TelemetrySample) -> None:
