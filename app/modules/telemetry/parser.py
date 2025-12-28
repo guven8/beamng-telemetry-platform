@@ -114,7 +114,8 @@ def parse_outgauge_packet(data: bytes) -> TelemetrySample | None:
                 logger.warning(f"Unexpected gear_char type: {type(gear_char)}, value: {repr(gear_char)}")
             
             # Parse gear value
-            # BeamNG OutGauge uses numeric values: 0=neutral, 1-9=gears, might use -1 for reverse
+            # BeamNG.drive uses 1-indexed numeric values: 1=neutral, 2=gear1, 3=gear2, etc.
+            # We convert to 0-indexed: 0=neutral, 1=gear1, 2=gear2, -1=reverse
             # Some implementations use ASCII chars ('R', 'N', '0'-'9'), others use direct numeric
             if gear_byte is not None:
                 # First check for ASCII character format
@@ -124,16 +125,17 @@ def parse_outgauge_packet(data: bytes) -> TelemetrySample | None:
                     gear = 0  # Neutral
                 elif ord('0') <= gear_byte <= ord('9'):
                     gear = gear_byte - ord('0')
-                # Then check for direct numeric format (BeamNG style)
-                elif 0 <= gear_byte <= 9:
-                    # Direct numeric: 0=neutral, 1-9=gears
-                    gear = gear_byte
+                # Then check for direct numeric format (BeamNG style - 1-indexed)
+                elif 1 <= gear_byte <= 10:
+                    # BeamNG sends: 1=neutral, 2=gear1, 3=gear2, ..., 10=gear9
+                    # Convert to: 0=neutral, 1=gear1, 2=gear2, ..., 9=gear9
+                    gear = gear_byte - 1
+                elif gear_byte == 0:
+                    # 0 might indicate reverse in BeamNG
+                    gear = -1
                 elif gear_byte == 255 or gear_byte == 0xFF:
                     # 0xFF might indicate reverse in some implementations
                     gear = -1
-                elif gear_byte == 0:
-                    # Null byte - neutral
-                    gear = 0
                 else:
                     # Unknown gear value - log for debugging (only first few times to avoid spam)
                     if not hasattr(parse_outgauge_packet, '_gear_warn_count'):
@@ -187,7 +189,8 @@ def parse_outgauge_packet(data: bytes) -> TelemetrySample | None:
                     gear_byte = 0
                 
                 # Parse gear value
-                # BeamNG OutGauge uses numeric values: 0=neutral, 1-9=gears
+                # BeamNG.drive uses 1-indexed numeric values: 1=neutral, 2=gear1, 3=gear2, etc.
+                # Convert to 0-indexed: 0=neutral, 1=gear1, 2=gear2, -1=reverse
                 if gear_byte is not None:
                     # First check for ASCII character format
                     if gear_byte == ord('R') or gear_byte == ord('r'):
@@ -196,15 +199,17 @@ def parse_outgauge_packet(data: bytes) -> TelemetrySample | None:
                         gear = 0
                     elif ord('0') <= gear_byte <= ord('9'):
                         gear = gear_byte - ord('0')
-                    # Then check for direct numeric format (BeamNG style)
-                    elif 0 <= gear_byte <= 9:
-                        # Direct numeric: 0=neutral, 1-9=gears
-                        gear = gear_byte
+                    # Then check for direct numeric format (BeamNG style - 1-indexed)
+                    elif 1 <= gear_byte <= 10:
+                        # BeamNG sends: 1=neutral, 2=gear1, 3=gear2, ..., 10=gear9
+                        # Convert to: 0=neutral, 1=gear1, 2=gear2, ..., 9=gear9
+                        gear = gear_byte - 1
+                    elif gear_byte == 0:
+                        # 0 might indicate reverse in BeamNG
+                        gear = -1
                     elif gear_byte == 255 or gear_byte == 0xFF:
                         # 0xFF might indicate reverse
                         gear = -1
-                    elif gear_byte == 0:
-                        gear = 0  # Null byte = neutral
                     else:
                         gear = None
                 
