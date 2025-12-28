@@ -93,3 +93,4 @@ async def telemetry_consumer(queue: asyncio.Queue) -> None:
         logger.error(f"Fatal error in telemetry consumer: {e}", exc_info=True)
         raise
 
+
