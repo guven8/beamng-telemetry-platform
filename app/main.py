@@ -15,6 +15,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.modules.auth.router import router as auth_router
 from app.modules.telemetry.listener import udp_listener
+from app.modules.stream.router import router as stream_router
+from app.modules.stream.consumer import telemetry_consumer
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +29,10 @@ async def lifespan(app: FastAPI):
     On startup:
     - Creates the telemetry queue
     - Starts the UDP listener as a background task
+    - Starts the telemetry consumer as a background task
     
     On shutdown:
-    - Cancels the UDP listener task cleanly
+    - Cancels all background tasks cleanly
     """
     # Startup
     logger.info("Starting BeamNG Telemetry Platform...")
@@ -42,10 +45,22 @@ async def lifespan(app: FastAPI):
     udp_task = asyncio.create_task(udp_listener(app.state.telemetry_queue))
     logger.info("Started UDP listener background task")
     
+    # Start telemetry consumer as background task
+    consumer_task = asyncio.create_task(telemetry_consumer(app.state.telemetry_queue))
+    logger.info("Started telemetry consumer background task")
+    
     yield
     
     # Shutdown
     logger.info("Shutting down BeamNG Telemetry Platform...")
+    
+    # Cancel telemetry consumer task
+    if not consumer_task.done():
+        consumer_task.cancel()
+        try:
+            await consumer_task
+        except asyncio.CancelledError:
+            logger.info("Telemetry consumer task cancelled")
     
     # Cancel UDP listener task
     if not udp_task.done():
@@ -77,6 +92,7 @@ app.add_middleware(
 
 # Include feature module routers
 app.include_router(auth_router)
+app.include_router(stream_router)
 
 
 @app.get("/health")
