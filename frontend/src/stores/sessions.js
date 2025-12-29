@@ -17,7 +17,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     error.value = null
     
     try {
-      const response = await fetch(`${API_BASE}/sessions`, {
+      const response = await fetch(`${API_BASE}/api/sessions`, {
         headers: {
           'Authorization': `Bearer ${authStore.token}`,
         },
@@ -48,7 +48,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     error.value = null
     
     try {
-      const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+      const response = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
         headers: {
           'Authorization': `Bearer ${authStore.token}`,
         },

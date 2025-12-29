@@ -91,12 +91,14 @@ The frontend will be available at `http://localhost:5173`
 
 ## API Endpoints
 
-- `POST /auth/login` - Login and get JWT token
-- `GET /health` - Health check
-- `GET /telemetry/debug` - Telemetry debug info
-- `WS /ws/telemetry?token=<jwt>` - WebSocket for real-time telemetry
-- `GET /sessions` - List all sessions (requires auth)
-- `GET /sessions/{id}` - Get session detail with frames (requires auth)
+All API endpoints are prefixed with `/api`:
+
+- `POST /api/auth/login` - Login and get JWT token
+- `GET /api/health` - Health check
+- `GET /api/telemetry/debug` - Telemetry debug info
+- `WS /api/ws/telemetry?token=<jwt>` - WebSocket for real-time telemetry
+- `GET /api/sessions` - List all sessions (requires auth)
+- `GET /api/sessions/{id}` - Get session detail with frames (requires auth)
 
 ## Environment Variables
 

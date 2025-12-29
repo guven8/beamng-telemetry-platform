@@ -118,18 +118,19 @@ app.add_middleware(
 )
 
 # Include feature module routers (must be before static file serving)
-app.include_router(auth_router)
-app.include_router(stream_router)
-app.include_router(analytics_router)
+# All API routes are prefixed with /api
+app.include_router(auth_router, prefix="/api")
+app.include_router(stream_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
 
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     """Health check endpoint for monitoring and deployment verification."""
     return {"status": "healthy", "service": "beamng-telemetry-platform"}
 
 
-@app.get("/telemetry/debug")
+@app.get("/api/telemetry/debug")
 async def telemetry_debug():
     """
     Debug endpoint to check telemetry module status.
@@ -172,7 +173,7 @@ if static_path.exists():
         API routes are handled by routers above, so they take precedence.
         """
         # Skip if this is an API route (shouldn't happen due to route order, but safety check)
-        if full_path.startswith(("auth/", "sessions", "ws/", "health", "telemetry/")):
+        if full_path.startswith("api/"):
             return {"detail": "Not found"}
         
         index_file = static_path / "index.html"

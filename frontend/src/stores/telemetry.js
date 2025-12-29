@@ -29,7 +29,7 @@ export const useTelemetryStore = defineStore('telemetry', () => {
       return
     }
 
-    const wsUrl = `${API_BASE}/ws/telemetry?token=${token}`
+    const wsUrl = `${API_BASE}/api/ws/telemetry?token=${token}`
     console.log('Connecting to WebSocket:', wsUrl.replace(token, 'token=***'))
     const ws = new WebSocket(wsUrl)
 

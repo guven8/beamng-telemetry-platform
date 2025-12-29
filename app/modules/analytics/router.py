@@ -8,6 +8,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
 from app.modules.analytics.database import get_db
 from app.modules.analytics.models import Session as SessionModel, TelemetryFrame
 from app.modules.analytics.schemas import SessionResponse, SessionDetailResponse, TelemetryFrameResponse
@@ -75,6 +76,12 @@ async def list_sessions(
             result.append(SessionResponse(**session_dict))
         
         return result
+    except OperationalError as e:
+        logger.error(f"Database connection error listing sessions: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database is not available. Please check your database connection."
+        )
     except Exception as e:
         logger.error(f"Error listing sessions: {e}", exc_info=True)
         raise HTTPException(
@@ -131,6 +138,12 @@ async def get_session(
         )
     except HTTPException:
         raise
+    except OperationalError as e:
+        logger.error(f"Database connection error retrieving session {session_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database is not available. Please check your database connection."
+        )
     except Exception as e:
         logger.error(f"Error retrieving session {session_id}: {e}", exc_info=True)
         raise HTTPException(

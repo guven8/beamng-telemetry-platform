@@ -10,7 +10,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(usernameInput, password) {
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
