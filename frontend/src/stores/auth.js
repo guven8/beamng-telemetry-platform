@@ -5,7 +5,8 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('jwt_token') || null)
   const username = ref(null)
 
-  const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+  // Use relative path when served from same origin (Docker), or absolute for dev
+  const API_BASE = import.meta.env.VITE_API_BASE || ''
 
   async function login(usernameInput, password) {
     try {

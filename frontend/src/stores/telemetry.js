@@ -8,7 +8,11 @@ export const useTelemetryStore = defineStore('telemetry', () => {
   const websocket = ref(null)
   const isConnected = ref(false)
 
-  const API_BASE = import.meta.env.VITE_WS_BASE || 'ws://localhost:8000'
+  // Use relative WebSocket URL when served from same origin (Docker), or absolute for dev
+  // Detect protocol from current location
+  const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsHost = typeof window !== 'undefined' ? window.location.host : 'localhost:8000'
+  const API_BASE = import.meta.env.VITE_WS_BASE || `${wsProtocol}//${wsHost}`
 
   function connectWebSocket(token) {
     // Close existing connection if any

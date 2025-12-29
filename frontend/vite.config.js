@@ -3,6 +3,12 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
+  // Build configuration for production
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+  },
+  // Development server configuration
   server: {
     port: 5173,
     proxy: {

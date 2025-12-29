@@ -75,6 +75,7 @@ class UDPProtocol(asyncio.DatagramProtocol):
         self.queue = queue
         self.packet_count = 0
         self.error_count = 0
+        self.ignored_count = 0  # Track intentionally ignored packets (MotionSim, wrong size)
     
     def datagram_received(self, data: bytes, addr: tuple) -> None:
         """
@@ -90,9 +91,26 @@ class UDPProtocol(asyncio.DatagramProtocol):
         sample = parse_outgauge_packet(data)
         
         if sample is None:
-            self.error_count += 1
-            if self.error_count % 100 == 0:  # Log every 100th error to avoid spam
-                logger.warning(f"Failed to parse packet from {addr} (total errors: {self.error_count})")
+            # Check if this is an intentionally ignored packet (MotionSim or wrong size)
+            # These are expected when BeamNG sends multiple protocols on the same port
+            is_ignored = False
+            if len(data) >= 4 and data.startswith(b"BNG1"):
+                # MotionSim packet - intentionally ignored
+                is_ignored = True
+            elif len(data) != 96:
+                # Wrong size - likely different protocol or malformed
+                is_ignored = True
+            
+            if is_ignored:
+                self.ignored_count += 1
+                # Only log ignored packets occasionally to show they're being filtered
+                if self.ignored_count % 1000 == 0:
+                    logger.debug(f"Ignored {self.ignored_count} non-OutGauge packets (MotionSim or wrong size)")
+            else:
+                # Actual parsing error
+                self.error_count += 1
+                if self.error_count % 100 == 0:  # Log every 100th error to avoid spam
+                    logger.warning(f"Failed to parse packet from {addr} (total errors: {self.error_count})")
             return
         
         # Log basic info periodically (every 100 packets to avoid spam)

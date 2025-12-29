@@ -8,7 +8,8 @@ export const useSessionsStore = defineStore('sessions', () => {
   const loading = ref(false)
   const error = ref(null)
 
-  const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+  // Use relative path when served from same origin (Docker), or absolute for dev
+  const API_BASE = import.meta.env.VITE_API_BASE || ''
   const authStore = useAuthStore()
 
   async function fetchSessions() {

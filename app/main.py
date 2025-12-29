@@ -10,9 +10,12 @@ Modular monolith architecture with feature modules:
 import asyncio
 import logging
 import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.modules.auth.router import router as auth_router
 from app.modules.telemetry.listener import udp_listener
 from app.modules.stream.router import router as stream_router
@@ -41,12 +44,13 @@ async def lifespan(app: FastAPI):
     logger.info("Starting BeamNG Telemetry Platform...")
     
     # Initialize database tables
+    # Note: Models are imported inside init_db() to ensure they're registered
     try:
         init_db()
-        logger.info("Database initialized")
+        logger.info("Database initialized successfully")
     except Exception as e:
-        logger.warning(f"Database initialization warning: {e}")
-        logger.warning("Continuing without database - persistence will not work")
+        logger.error(f"Database initialization failed: {e}", exc_info=True)
+        logger.error("Continuing without database - persistence will not work")
     
     # Create telemetry queue for internal communication
     app.state.telemetry_queue = asyncio.Queue()
@@ -113,7 +117,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include feature module routers
+# Include feature module routers (must be before static file serving)
 app.include_router(auth_router)
 app.include_router(stream_router)
 app.include_router(analytics_router)
@@ -138,4 +142,41 @@ async def telemetry_debug():
         "queue_size": queue_size,
         "udp_port": int(os.getenv("UDP_PORT", 4444))
     }
+
+# Serve static frontend files (built Vue app)
+# Check if static directory exists (Docker build) or use frontend/dist (local dev)
+static_path = Path("/app/static")
+if not static_path.exists():
+    static_path = Path(__file__).parent.parent / "frontend" / "dist"
+
+if static_path.exists():
+    # Mount static assets (JS, CSS, images, etc.)
+    assets_dir = static_path / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+    
+    # Serve index.html for root and all non-API routes (SPA routing)
+    # This must be last so API routes take precedence
+    @app.get("/")
+    async def serve_index():
+        """Serve frontend index.html for root path."""
+        index_file = static_path / "index.html"
+        if index_file.exists():
+            return FileResponse(str(index_file))
+        return {"detail": "Frontend not found"}
+    
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """
+        Serve frontend index.html for all non-API routes (SPA routing).
+        API routes are handled by routers above, so they take precedence.
+        """
+        # Skip if this is an API route (shouldn't happen due to route order, but safety check)
+        if full_path.startswith(("auth/", "sessions", "ws/", "health", "telemetry/")):
+            return {"detail": "Not found"}
+        
+        index_file = static_path / "index.html"
+        if index_file.exists():
+            return FileResponse(str(index_file))
+        return {"detail": "Frontend not found"}
 

@@ -1,20 +1,36 @@
 services:
-  postgres:
+  db:
     image: postgres:15
     container_name: beamng-telemetry-db
     environment:
       POSTGRES_USER: beamng
       POSTGRES_PASSWORD: beamng
       POSTGRES_DB: beamng_telemetry
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U beamng"]
+      test: ["CMD-SHELL", "pg_isready -U beamng -d beamng_telemetry"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: beamng-telemetry-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://beamng:beamng@db:5432/beamng_telemetry
+      UDP_PORT: 4444
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
+      SEEDED_USER_PASSWORD: ${SEEDED_USER_PASSWORD:-local}
+    ports:
+      - "8000:8000"
+      - "4444:4444/udp"
+    restart: unless-stopped
 
 volumes:
   postgres_data:
