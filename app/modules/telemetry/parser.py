@@ -12,7 +12,7 @@ BeamNG Compatibility:
 """
 import struct
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from app.modules.telemetry.schemas import TelemetrySample
 
 logger = logging.getLogger(__name__)
@@ -190,7 +190,7 @@ def parse_outgauge_packet(data: bytes) -> TelemetrySample | None:
             gear=gear,
             g_force_x=g_force_x,
             g_force_y=g_force_y,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             raw_bytes=data if len(data) <= 200 else None  # Store raw bytes for debugging (limit size)
         )
         

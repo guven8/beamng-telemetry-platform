@@ -89,6 +89,30 @@ The frontend will be available at `http://localhost:5173`
 
 **Note:** In production (Docker), the frontend is built and served from the same container as the backend at `http://localhost:8000`.
 
+## Testing
+
+Run the test suite with pytest:
+
+```bash
+pytest
+```
+
+The test suite includes:
+- **Unit tests** for telemetry parser (`tests/test_telemetry_parser.py`)
+  - Valid OutGauge packet parsing
+  - MotionSim packet rejection
+  - Wrong-size packet handling
+- **Unit tests** for analytics calculations (`tests/test_analytics.py`)
+  - Session analytics with various frame scenarios
+  - Edge cases (no frames, single frame, None values)
+- **API integration tests** (`tests/test_api_integration.py`)
+  - Health check endpoint
+  - Authentication (login success/failure)
+  - Protected endpoints (sessions API)
+  - Telemetry debug endpoint
+
+Tests use an in-memory SQLite database and don't require a running PostgreSQL instance.
+
 ## API Endpoints
 
 All API endpoints are prefixed with `/api`:

@@ -5,7 +5,7 @@ Defines SQLAlchemy models for persistence of telemetry data.
 """
 from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from app.modules.analytics.database import Base
 
 
@@ -21,7 +21,7 @@ class Session(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False, index=True)
     car_name = Column(String, nullable=True)  # Optional for MVP
-    start_time = Column(DateTime, nullable=False, default=datetime.utcnow)
+    start_time = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     end_time = Column(DateTime, nullable=True)
     
     # Relationship to telemetry frames

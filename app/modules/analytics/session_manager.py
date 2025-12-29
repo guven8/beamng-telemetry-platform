@@ -13,7 +13,7 @@ Session Lifecycle:
 """
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.modules.analytics.models import Session as SessionModel
@@ -65,7 +65,7 @@ class SessionManager:
         Returns:
             Current active session if one exists, None otherwise
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Check if we're moving (speed above threshold)
         moving = sample.speed is not None and sample.speed > MOVEMENT_THRESHOLD

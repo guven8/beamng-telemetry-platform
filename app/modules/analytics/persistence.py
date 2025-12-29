@@ -5,7 +5,7 @@ Consumes telemetry samples from queue and persists them at controlled intervals.
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.modules.analytics.database import SessionLocal
 from app.modules.analytics.models import TelemetryFrame
@@ -59,7 +59,7 @@ async def persistence_worker(queue: asyncio.Queue) -> None:
                 
                 # Save frame if we have an active session and save interval has passed
                 if current_session is not None:
-                    now = datetime.utcnow()
+                    now = datetime.now(timezone.utc)
                     if session_manager.should_save_frame(now):
                         _save_frame(db, current_session.id, sample)
                         session_manager.update_save_time(now)
@@ -80,7 +80,7 @@ async def persistence_worker(queue: asyncio.Queue) -> None:
         logger.info("Persistence worker cancelled, shutting down...")
         # End current session if active before shutdown
         if session_manager.current_session is not None:
-            session_manager._end_session(datetime.utcnow())
+            session_manager._end_session(datetime.now(timezone.utc))
         raise
     except Exception as e:
         logger.error(f"Fatal error in persistence worker: {e}", exc_info=True)
