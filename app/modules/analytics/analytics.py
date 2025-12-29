@@ -6,7 +6,26 @@ KISS principle - straightforward Python calculations.
 """
 from typing import List, Optional
 from app.modules.analytics.models import TelemetryFrame, Session as SessionModel
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _ensure_timezone_aware(dt: datetime) -> datetime:
+    """
+    Ensure a datetime is timezone-aware (UTC).
+    
+    If the datetime is naive, assume it's UTC and add timezone info.
+    This is a defensive measure to handle edge cases where naive datetimes
+    might exist (e.g., from old database records).
+    
+    Args:
+        dt: Datetime that may be naive or aware
+        
+    Returns:
+        Timezone-aware datetime (UTC)
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def calculate_session_analytics(
@@ -32,12 +51,18 @@ def calculate_session_analytics(
     
     # Calculate duration
     if session.end_time:
-        duration = session.end_time - session.start_time
+        # Ensure both datetimes are timezone-aware for comparison
+        end_time_aware = _ensure_timezone_aware(session.end_time)
+        start_time_aware = _ensure_timezone_aware(session.start_time)
+        duration = end_time_aware - start_time_aware
         analytics["duration_seconds"] = duration.total_seconds()
     elif frames:
         # If session is still active, use last frame timestamp
         last_frame_time = max(f.timestamp for f in frames)
-        duration = last_frame_time - session.start_time
+        # Ensure both datetimes are timezone-aware for comparison
+        last_frame_aware = _ensure_timezone_aware(last_frame_time)
+        start_time_aware = _ensure_timezone_aware(session.start_time)
+        duration = last_frame_aware - start_time_aware
         analytics["duration_seconds"] = duration.total_seconds()
     
     if not frames:

@@ -156,9 +156,12 @@ class SessionManager:
             self.current_session.end_time = end_time
             self.db.commit()
             
-            duration = end_time - self.current_session.start_time
+            # Ensure both datetimes are timezone-aware for comparison
+            end_time_aware = _ensure_timezone_aware(end_time)
+            start_time_aware = _ensure_timezone_aware(self.current_session.start_time)
+            duration = end_time_aware - start_time_aware
             logger.info(
-                f"Ended session {session_id} at {end_time} "
+                f"Ended session {session_id} at {end_time_aware} "
                 f"(duration: {duration}, frame_count: {frame_count})"
             )
             
