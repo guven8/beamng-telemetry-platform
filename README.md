@@ -2,6 +2,12 @@
 
 A lean, self-hosted real-time telemetry platform built for BeamNG.drive.
 
+## 🎥 Demo
+
+Watch the platform in action: a BeamNG car driving with real-time telemetry streaming to the dashboard, where speed graphs react live as the vehicle accelerates and decelerates.
+
+[![Watch the demo](docs/demo_screenshot.webp)](https://www.youtube.com/watch?v=UZdo-Hee7BQ)
+
 ## Features
 
 - Real-time telemetry ingestion via UDP (OutGauge protocol)
