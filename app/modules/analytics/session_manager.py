@@ -27,6 +27,25 @@ INACTIVITY_TIMEOUT = timedelta(seconds=30)  # End session after 30s of no moveme
 FRAME_SAVE_INTERVAL = timedelta(seconds=1)  # Save frame every 1 second
 
 
+def _ensure_timezone_aware(dt: datetime) -> datetime:
+    """
+    Ensure a datetime is timezone-aware (UTC).
+    
+    If the datetime is naive, assume it's UTC and add timezone info.
+    This is a defensive measure to handle edge cases where naive datetimes
+    might exist (e.g., from old database records).
+    
+    Args:
+        dt: Datetime that may be naive or aware
+        
+    Returns:
+        Timezone-aware datetime (UTC)
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 class SessionManager:
     """
     Manages telemetry sessions: starting, stopping, and tracking state.
@@ -81,9 +100,11 @@ class SessionManager:
         
         # End session if inactive for too long (only if we have an active session)
         if (self.current_session is not None and 
-            self.last_activity_time is not None and
-            now - self.last_activity_time > INACTIVITY_TIMEOUT):
-            self._end_session(now)
+            self.last_activity_time is not None):
+            # Ensure both datetimes are timezone-aware for comparison
+            last_activity_aware = _ensure_timezone_aware(self.last_activity_time)
+            if now - last_activity_aware > INACTIVITY_TIMEOUT:
+                self._end_session(now)
             # After ending, current_session is None, allowing a new session to start
             # when movement resumes
         
@@ -161,19 +182,22 @@ class SessionManager:
         session should be ended due to inactivity.
         
         Args:
-            now: Current timestamp
+            now: Current timestamp (should be timezone-aware)
         """
         if (self.current_session is not None and 
-            self.last_activity_time is not None and
-            now - self.last_activity_time > INACTIVITY_TIMEOUT):
-            self._end_session(now)
+            self.last_activity_time is not None):
+            # Ensure both datetimes are timezone-aware for comparison
+            now_aware = _ensure_timezone_aware(now)
+            last_activity_aware = _ensure_timezone_aware(self.last_activity_time)
+            if now_aware - last_activity_aware > INACTIVITY_TIMEOUT:
+                self._end_session(now_aware)
     
     def should_save_frame(self, now: datetime) -> bool:
         """
         Check if we should save a frame based on save interval.
         
         Args:
-            now: Current timestamp
+            now: Current timestamp (should be timezone-aware)
             
         Returns:
             True if frame should be saved
@@ -181,7 +205,10 @@ class SessionManager:
         if self.last_save_time is None:
             return True
         
-        return now - self.last_save_time >= FRAME_SAVE_INTERVAL
+        # Ensure both datetimes are timezone-aware for comparison
+        now_aware = _ensure_timezone_aware(now)
+        last_save_aware = _ensure_timezone_aware(self.last_save_time)
+        return now_aware - last_save_aware >= FRAME_SAVE_INTERVAL
     
     def update_save_time(self, now: datetime) -> None:
         """Update the last save time."""

@@ -68,7 +68,7 @@ async def persistence_worker(queue: asyncio.Queue) -> None:
                 # Timeout is expected - allows us to check for cancellation
                 # Check if we need to end an inactive session
                 # This ensures sessions end even if no new samples arrive
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 session_manager.check_inactivity(now)
                 continue
             except Exception as e:
